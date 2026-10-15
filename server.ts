@@ -10,9 +10,42 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Security HTTP headers
+app.use((_req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  next();
+});
+
+// JSON body parser with size limit to prevent payload flooding
 app.use(express.json({ limit: '25mb' }));
 
-// Initialize GoogleGenAI SDK with required telemetry header
+/**
+ * Sanitizes error messages to strictly prevent leaking API keys, credentials,
+ * or internal URLs to clients.
+ */
+function sanitizeErrorMessage(error: any, fallbackMessage: string): string {
+  if (!error) return fallbackMessage;
+  const raw = typeof error === 'string' ? error : (error.message || fallbackMessage);
+  return String(raw)
+    .replace(/AIza[0-9A-Za-z\-_]{35}/g, '[REDACTED_API_KEY]')
+    .replace(/key=[0-9A-Za-z\-_]+/gi, 'key=[REDACTED]')
+    .replace(/Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, 'Bearer [REDACTED]')
+    .replace(/apiKey[:=]\s*["']?[^"'\s]+["']?/gi, 'apiKey=[REDACTED]');
+}
+
+/**
+ * Validates whether the Gemini API key is present and configured.
+ */
+function isGeminiKeyConfigured(): boolean {
+  const key = process.env.GEMINI_API_KEY;
+  return Boolean(key && key.trim().length > 0 && key !== 'MY_GEMINI_API_KEY');
+}
+
+// Initialize GoogleGenAI SDK securely
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY,
   httpOptions: {
@@ -25,15 +58,31 @@ const ai = new GoogleGenAI({
 // 1. Multi-turn Gemini Chatbot Endpoint
 app.post('/api/chat', async (req, res) => {
   try {
+    if (!isGeminiKeyConfigured()) {
+      return res.status(503).json({
+        error: 'AI assistant is currently offline: GEMINI_API_KEY is not configured in server environment.',
+      });
+    }
+
     const { messages, modelChoice = 'gemini-3.8-flash', systemPrompt } = req.body;
     
     // Choose model safely: gemini-3.8-flash (standard), gemini-3.1-flash-lite (fast)
     const validModel = modelChoice === 'gemini-3.1-flash-lite' ? 'gemini-3.1-flash-lite' : 'gemini-3.8-flash';
 
-    const systemInstruction = systemPrompt || 
+    const systemInstruction = (typeof systemPrompt === 'string' && systemPrompt.slice(0, 1000)) || 
       'You are EDSER AI Assistant, a friendly and thoughtful specialist in mindful daily planning, digital organization spreadsheets, and screen-free creative activities for children. Provide helpful, calm, practical answers with elegant formatting.';
 
-    const contents = Array.isArray(messages) ? messages : [{ role: 'user', parts: [{ text: req.body.prompt || 'Hello' }] }];
+    // Validate and limit contents to prevent memory exhaustion
+    let contents: any[] = [];
+    if (Array.isArray(messages)) {
+      contents = messages.slice(-20).map((m: any) => ({
+        role: m.role === 'model' ? 'model' : 'user',
+        parts: [{ text: String(m.parts?.[0]?.text || m.text || '').slice(0, 4000) }],
+      }));
+    } else {
+      const promptText = String(req.body.prompt || 'Hello').slice(0, 4000);
+      contents = [{ role: 'user', parts: [{ text: promptText }] }];
+    }
 
     const response = await ai.models.generateContent({
       model: validModel,
@@ -49,22 +98,33 @@ app.post('/api/chat', async (req, res) => {
       model: validModel,
     });
   } catch (error: any) {
-    console.error('Chat error:', error);
-    res.status(500).json({ error: error?.message || 'Chat generation failed' });
+    console.error('Chat error occurred (details redacted from client response)');
+    res.status(500).json({ error: sanitizeErrorMessage(error, 'Chat generation encountered an error') });
   }
 });
 
 // 2. Audio Transcription Endpoint using gemini-3.5-transcribe
 app.post('/api/transcribe', async (req, res) => {
   try {
+    if (!isGeminiKeyConfigured()) {
+      return res.status(503).json({
+        error: 'Voice transcription is unavailable: GEMINI_API_KEY is not configured.',
+      });
+    }
+
     const { audioData, mimeType = 'audio/webm' } = req.body;
-    if (!audioData) {
-      return res.status(400).json({ error: 'Missing audioData' });
+    if (!audioData || typeof audioData !== 'string') {
+      return res.status(400).json({ error: 'Valid base64 audioData is required' });
+    }
+
+    // Limit maximum base64 audio data length (~20MB)
+    if (audioData.length > 25 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Audio payload exceeds size limit' });
     }
 
     const audioPart = {
       inlineData: {
-        mimeType,
+        mimeType: String(mimeType).slice(0, 64),
         data: audioData,
       },
     };
@@ -78,16 +138,20 @@ app.post('/api/transcribe', async (req, res) => {
 
     res.json({ transcript: response.text || '' });
   } catch (error: any) {
-    console.error('Transcribe error:', error);
-    res.status(500).json({ error: error?.message || 'Transcription failed' });
+    console.error('Transcribe error occurred');
+    res.status(500).json({ error: sanitizeErrorMessage(error, 'Voice transcription failed') });
   }
 });
 
 // 3. Google Search Grounding Endpoint using gemini-3.8-flash
 app.post('/api/search-grounding', async (req, res) => {
   try {
-    const { prompt } = req.body;
-    if (!prompt) return res.status(400).json({ error: 'Prompt required' });
+    if (!isGeminiKeyConfigured()) {
+      return res.status(503).json({ error: 'Search grounding unavailable: GEMINI_API_KEY is not configured.' });
+    }
+
+    const prompt = typeof req.body.prompt === 'string' ? req.body.prompt.trim().slice(0, 1000) : '';
+    if (!prompt) return res.status(400).json({ error: 'Valid prompt required' });
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
@@ -115,17 +179,22 @@ app.post('/api/search-grounding', async (req, res) => {
       sources: webSources,
     });
   } catch (error: any) {
-    console.error('Search grounding error:', error);
-    res.status(500).json({ error: error?.message || 'Search grounding failed' });
+    console.error('Search grounding error occurred');
+    res.status(500).json({ error: sanitizeErrorMessage(error, 'Search grounding failed') });
   }
 });
 
 // 4. Google Maps Grounding Endpoint using gemini-3.8-flash
 app.post('/api/maps-grounding', async (req, res) => {
   try {
-    const { query, latitude, longitude } = req.body;
-    if (!query) return res.status(400).json({ error: 'Query required' });
+    if (!isGeminiKeyConfigured()) {
+      return res.status(503).json({ error: 'Maps grounding unavailable: GEMINI_API_KEY is not configured.' });
+    }
 
+    const query = typeof req.body.query === 'string' ? req.body.query.trim().slice(0, 500) : '';
+    if (!query) return res.status(400).json({ error: 'Valid query required' });
+
+    const { latitude, longitude } = req.body;
     const toolConfig: any = {};
     if (typeof latitude === 'number' && typeof longitude === 'number') {
       toolConfig.retrievalConfig = {
@@ -163,20 +232,27 @@ app.post('/api/maps-grounding', async (req, res) => {
       places: mapPlaces,
     });
   } catch (error: any) {
-    console.error('Maps grounding error:', error);
-    res.status(500).json({ error: error?.message || 'Maps grounding failed' });
+    console.error('Maps grounding error occurred');
+    res.status(500).json({ error: sanitizeErrorMessage(error, 'Maps grounding failed') });
   }
 });
 
 // 5. Veo Video Generation API (text-to-video & image-to-video)
 app.post('/api/generate-video', async (req, res) => {
   try {
+    if (!isGeminiKeyConfigured()) {
+      return res.status(200).json({
+        simulated: true,
+        message: 'Veo video preview mode active.',
+        videoUrl: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+      });
+    }
+
     const { prompt, imageBase64, aspectRatio = '16:9' } = req.body;
     
-    // Attempt Veo generation
     const requestPayload: any = {
       model: 'veo-3.1-lite-generate-preview',
-      prompt: prompt || 'A gentle breeze flipping pages of an undated aesthetic planner on a warm sunny table',
+      prompt: typeof prompt === 'string' ? prompt.slice(0, 500) : 'A gentle breeze flipping pages of an undated aesthetic planner on a warm sunny table',
       config: {
         numberOfVideos: 1,
         resolution: '720p',
@@ -184,9 +260,9 @@ app.post('/api/generate-video', async (req, res) => {
       },
     };
 
-    if (imageBase64) {
+    if (imageBase64 && typeof imageBase64 === 'string') {
       requestPayload.image = {
-        imageBytes: imageBase64.replace(/^data:image\/[a-z]+;base64,/, ''),
+        imageBytes: imageBase64.replace(/^data:image\/[a-z]+;base64,/, '').slice(0, 15 * 1024 * 1024),
         mimeType: 'image/png',
       };
     }
@@ -194,8 +270,7 @@ app.post('/api/generate-video', async (req, res) => {
     const operation = await ai.models.generateVideos(requestPayload);
     res.json({ operationName: operation.name });
   } catch (error: any) {
-    // If user has not enabled a paid key, explain cleanly without crashing
-    console.warn('Veo generation note:', error?.message);
+    console.warn('Veo generation notice: falling back cleanly to preview mode');
     res.status(200).json({
       simulated: true,
       message: 'Video generation requires billing on the Google Cloud project. Preview mode simulated.',
@@ -207,11 +282,21 @@ app.post('/api/generate-video', async (req, res) => {
 // 6. Lyria Music Generation API
 app.post('/api/generate-music', async (req, res) => {
   try {
-    const { prompt = 'Tranquil acoustic piano and birdsong for mindful daily morning planning' } = req.body;
+    if (!isGeminiKeyConfigured()) {
+      return res.status(200).json({
+        simulated: true,
+        message: 'Lyria soundscape preview mode active.',
+        audioUrl: 'https://cdn.freesound.org/previews/560/560446_11861866-lq.mp3',
+      });
+    }
+
+    const promptText = typeof req.body.prompt === 'string' 
+      ? req.body.prompt.slice(0, 300) 
+      : 'Tranquil acoustic piano and birdsong for mindful daily morning planning';
     
     const responseStream = await ai.models.generateContentStream({
       model: 'lyria-3-clip-preview',
-      contents: prompt,
+      contents: promptText,
     });
 
     let audioBase64 = '';
@@ -232,7 +317,7 @@ app.post('/api/generate-music', async (req, res) => {
 
     res.json({ audioBase64, mimeType });
   } catch (error: any) {
-    console.warn('Lyria generation note:', error?.message);
+    console.warn('Lyria soundscape notice: falling back cleanly to preview mode');
     res.status(200).json({
       simulated: true,
       message: 'Lyria music generation requires a paid key. Preview soundscape generated.',
@@ -245,8 +330,14 @@ app.post('/api/generate-music', async (req, res) => {
 // Integrated from science skill (PubMed + UniProt + PDB) for nature journaling and biodiversity
 app.get('/api/science/species', async (req, res) => {
   try {
-    const query = String(req.query.q || 'Ursus arctos'); // Default brown bear for National Parks
-    const response = await fetch(`https://rest.uniprot.org/taxonomy/search?query=${encodeURIComponent(query)}&format=json&size=5`);
+    // Sanitize query to letters, numbers, spaces, and hyphens to prevent query injection
+    const rawQuery = String(req.query.q || 'Ursus arctos').slice(0, 80);
+    const sanitizedQuery = rawQuery.replace(/[^a-zA-Z0-9\s\-]/g, '').trim() || 'Ursus arctos';
+
+    const response = await fetch(`https://rest.uniprot.org/taxonomy/search?query=${encodeURIComponent(sanitizedQuery)}&format=json&size=5`);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Upstream taxonomy service error' });
+    }
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
@@ -256,8 +347,13 @@ app.get('/api/science/species', async (req, res) => {
 
 app.get('/api/science/botanical', async (req, res) => {
   try {
-    const query = String(req.query.q || 'Salvia officinalis'); // Sage sprigs
-    const response = await fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(query + ' AND botany')}&retmode=json&retmax=5`);
+    const rawQuery = String(req.query.q || 'Salvia officinalis').slice(0, 80);
+    const sanitizedQuery = rawQuery.replace(/[^a-zA-Z0-9\s\-]/g, '').trim() || 'Salvia officinalis';
+
+    const response = await fetch(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pmc&term=${encodeURIComponent(sanitizedQuery + ' AND botany')}&retmode=json&retmax=5`);
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Upstream botanical service error' });
+    }
     const data = await response.json();
     res.json(data);
   } catch (error: any) {
@@ -283,7 +379,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`EDSER Full-Stack Server running at http://0.0.0.0:${PORT}`);
+    console.log(`EDSER Full-Stack Server running securely at http://0.0.0.0:${PORT}`);
   });
 }
 
