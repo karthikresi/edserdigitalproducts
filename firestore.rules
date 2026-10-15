@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // User Profiles
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId)
+        && request.resource.data.userId == userId
+        && request.resource.data.email is string
+        && request.resource.data.email.size() <= 256
+        && (!('wishlist' in request.resource.data) || (request.resource.data.wishlist is list && request.resource.data.wishlist.size() <= 100));
+      allow delete: if isOwner(userId);
+
+      // User Bookmarked / Saved Items Subcollection
+      match /saved/{productId} {
+        allow read, write: if isOwner(userId) && isValidId(productId);
+      }
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow create: if isSignedIn()
+        && isValidId(orderId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.orderId == orderId
+        && request.resource.data.total is number
+        && request.resource.data.total >= 0
+        && request.resource.data.customerEmail is string
+        && request.resource.data.customerEmail.size() <= 256
+        && request.resource.data.downloadAccessCode is string
+        && request.resource.data.downloadAccessCode.size() <= 64;
+
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.customerEmail == request.auth.token.email
+      );
+
+      // Prevent updating or deleting historical completed orders via client
+      allow update, delete: if false;
+    }
+
+    // Product Customer Reviews
+    match /products/{productId}/reviews/{reviewId} {
+      // Anyone can read reviews
+      allow read: if true;
+
+      // Authenticated users can create reviews
+      allow create: if isSignedIn()
+        && isValidId(productId)
+        && isValidId(reviewId)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.productId == productId
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string
+        && request.resource.data.comment.size() >= 3
+        && request.resource.data.comment.size() <= 1000
+        && request.resource.data.userName is string
+        && request.resource.data.userName.size() <= 128;
+
+      // Review author can update or delete their own review
+      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+  }
+}

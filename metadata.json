@@ -1,0 +1,6 @@
+{
+  "name": "EDSER — Mindful Digital Downloads & Creative Activities",
+  "description": "Discover printable planners, practical spreadsheets, and creative activities for everyday life and screen-free exploration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
