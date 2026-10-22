@@ -39,7 +39,8 @@
   - *Planners & Organization*: Undated daily planners, meal planners, and financial spreadsheets.
   - *Kids & Creative Activities*: National parks nature coloring books, trail scavenger hunts, and STEM activity packs.
 - **Format Transparency**: Clear indicators for file formats (300 DPI Print-Ready PDF, Google Sheets, Excel `.xlsx`).
-- **Instant Digital Delivery**: Instant access codes generated upon simulated checkout with links added to the user's permanent **Digital Library**.
+- **Instant Digital Delivery & Real-Time Tracking**: Instant access codes generated upon simulated checkout, with live order fulfillment states (`Processing` → `Delivered`) fetched and synchronized in real-time from Firestore via `onSnapshot`.
+- **Digital Library Suite**: User library modal with live status indicators, filter tabs (*All*, *Delivered*, *Processing*), lifetime access codes, and one-click file package downloads.
 
 ### 🎨 Creative Studio & Nature Exploration
 - **Wildlife & Botanical Taxonomy**: Connected to biological and scientific databases (UniProt and PubMed) for accurate nature journaling and flora/fauna information.

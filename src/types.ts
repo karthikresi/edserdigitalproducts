@@ -30,6 +30,8 @@ export interface CartItem {
   quantity: number;
 }
 
+export type OrderStatus = 'Processing' | 'Delivered';
+
 export interface Order {
   id: string;
   date: string;
@@ -38,6 +40,9 @@ export interface Order {
   items: CartItem[];
   total: number;
   downloadAccessCode: string;
+  status?: OrderStatus;
+  itemIds?: string[];
+  createdAt?: string;
 }
 
 export interface CollectionNotification {

@@ -57,10 +57,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       customerName: name || 'Valued Creator',
       items: [...items],
       total,
-      downloadAccessCode: accessCode
+      downloadAccessCode: accessCode,
+      status: 'Processing',
+      itemIds: items.map((i) => i.product.id),
+      createdAt: dateStr
     };
 
-    // If authenticated, persist to Firestore
+    // If authenticated, persist to Firestore with real-time status tracking
     if (auth.currentUser) {
       try {
         await setDoc(doc(db, 'orders', orderId), {
@@ -72,7 +75,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
           downloadAccessCode: accessCode,
           itemIds: items.map((i) => i.product.id),
           createdAt: dateStr,
+          status: 'Processing',
         });
+
+        // Simulate real-time digital file packaging and email delivery
+        setTimeout(async () => {
+          try {
+            await setDoc(doc(db, 'orders', orderId), {
+              status: 'Delivered',
+            }, { merge: true });
+          } catch (err) {
+            console.warn('Could not update order status in background:', err);
+          }
+        }, 3500);
       } catch (err) {
         console.warn('Could not persist order to Firestore:', err);
       }

@@ -78,6 +78,12 @@
           "description": "Secret access code for lifetime downloads",
           "maxLength": 64
         },
+        "status": {
+          "type": "string",
+          "description": "Real-time order fulfillment status",
+          "enum": ["Processing", "Delivered"],
+          "maxLength": 32
+        },
         "itemIds": {
           "type": "array",
           "description": "List of purchased digital product IDs"

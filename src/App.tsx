@@ -533,6 +533,10 @@ export default function App() {
         isOpen={isLibraryOpen}
         onClose={() => setIsLibraryOpen(false)}
         user={user}
+        onOpenAuth={() => {
+          setIsLibraryOpen(false);
+          setIsAuthOpen(true);
+        }}
       />
 
     </div>
