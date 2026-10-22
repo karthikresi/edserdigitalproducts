@@ -89,6 +89,7 @@
     │   ├── CheckoutModal.tsx   # Simulated digital checkout with instant delivery
     │   ├── WishlistModal.tsx   # Saved products drawer with Firestore sync
     │   ├── UserLibraryModal.tsx# Permanent customer download library
+    │   ├── ErrorBoundary.tsx   # Production React error boundary with Firestore incident logging
     │   ├── AuthModal.tsx       # Firebase Google & anonymous authentication
     │   ├── GeminiChatModal.tsx # Mindful AI concierge assistant
     │   ├── SearchBarModal.tsx  # Instant keyword and tag search overlay
@@ -152,6 +153,27 @@
 | `npm run start` | Serves the production build with Node.js Express server |
 | `npm run lint` | Runs `tsc --noEmit` to validate all TypeScript code |
 | `npm run clean` | Cleans build artifacts (`dist` and `server.js`) |
+
+---
+
+## 🌐 Deploying to Render (or Cloud Hosts)
+
+If deploying as a Web Service on [Render](https://render.com) (e.g. `edserdigitalproducts.onrender.com`):
+
+### Render Web Service Settings
+
+| Setting | Recommended Value | Why |
+| :--- | :--- | :--- |
+| **Runtime** | `Node` or `Bun` | Runs the full-stack server |
+| **Build Command** | `npm install && npm run build` *(or `bun install && bun run build`)* | **Required** to compile client assets into `/dist` prior to starting |
+| **Start Command** | `npm run start` *(or `bun run start`)* | Starts `node server.ts` |
+
+### Render Environment Variables
+
+In your Render Service Dashboard under **Environment**:
+- `NODE_ENV`: `production`
+- `GEMINI_API_KEY`: `your-gemini-api-key` *(required for AI Chat, Voice Transcription, and Grounding features)*
+- `PORT`: Automatically assigned by Render (handled dynamically by `server.ts`)
 
 ---
 

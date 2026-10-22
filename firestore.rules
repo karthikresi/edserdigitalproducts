@@ -87,5 +87,24 @@ service cloud.firestore {
       // Review author can update or delete their own review
       allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
+
+    // Error Logs Collection (Client Error Logging from ErrorBoundary)
+    match /error_logs/{logId} {
+      allow create: if isValidId(logId)
+        && request.resource.data.id == logId
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 1000
+        && request.resource.data.timestamp is string
+        && request.resource.data.timestamp.size() <= 64
+        && (!('stack' in request.resource.data) || (request.resource.data.stack is string && request.resource.data.stack.size() <= 4000))
+        && (!('componentStack' in request.resource.data) || (request.resource.data.componentStack is string && request.resource.data.componentStack.size() <= 4000))
+        && (!('url' in request.resource.data) || (request.resource.data.url is string && request.resource.data.url.size() <= 512))
+        && (!('userAgent' in request.resource.data) || (request.resource.data.userAgent is string && request.resource.data.userAgent.size() <= 512))
+        && (!('userId' in request.resource.data) || (request.resource.data.userId is string && request.resource.data.userId.size() <= 128))
+        && (!('userEmail' in request.resource.data) || (request.resource.data.userEmail is string && request.resource.data.userEmail.size() <= 256));
+
+      // Strictly deny reading, editing, or deleting error logs via client to protect diagnostics
+      allow read, update, delete: if false;
+    }
   }
 }

@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
@@ -45,20 +46,27 @@ function isGeminiKeyConfigured(): boolean {
   return Boolean(key && key.trim().length > 0 && key !== 'MY_GEMINI_API_KEY');
 }
 
-// Initialize GoogleGenAI SDK securely
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
+/**
+ * Lazily initializes GoogleGenAI only when a valid key exists,
+ * preventing noisy SDK startup warnings on cold boot.
+ */
+function getAIClient(): GoogleGenAI | null {
+  if (!isGeminiKeyConfigured()) return null;
+  return new GoogleGenAI({
+    apiKey: process.env.GEMINI_API_KEY,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
     },
-  },
-});
+  });
+}
 
 // 1. Multi-turn Gemini Chatbot Endpoint
 app.post('/api/chat', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(503).json({
         error: 'AI assistant is currently offline: GEMINI_API_KEY is not configured in server environment.',
       });
@@ -106,7 +114,8 @@ app.post('/api/chat', async (req, res) => {
 // 2. Audio Transcription Endpoint using gemini-3.5-transcribe
 app.post('/api/transcribe', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(503).json({
         error: 'Voice transcription is unavailable: GEMINI_API_KEY is not configured.',
       });
@@ -146,7 +155,8 @@ app.post('/api/transcribe', async (req, res) => {
 // 3. Google Search Grounding Endpoint using gemini-3.8-flash
 app.post('/api/search-grounding', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(503).json({ error: 'Search grounding unavailable: GEMINI_API_KEY is not configured.' });
     }
 
@@ -187,7 +197,8 @@ app.post('/api/search-grounding', async (req, res) => {
 // 4. Google Maps Grounding Endpoint using gemini-3.8-flash
 app.post('/api/maps-grounding', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(503).json({ error: 'Maps grounding unavailable: GEMINI_API_KEY is not configured.' });
     }
 
@@ -240,7 +251,8 @@ app.post('/api/maps-grounding', async (req, res) => {
 // 5. Veo Video Generation API (text-to-video & image-to-video)
 app.post('/api/generate-video', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(200).json({
         simulated: true,
         message: 'Veo video preview mode active.',
@@ -282,7 +294,8 @@ app.post('/api/generate-video', async (req, res) => {
 // 6. Lyria Music Generation API
 app.post('/api/generate-music', async (req, res) => {
   try {
-    if (!isGeminiKeyConfigured()) {
+    const ai = getAIClient();
+    if (!ai) {
       return res.status(200).json({
         simulated: true,
         message: 'Lyria soundscape preview mode active.',
@@ -361,10 +374,18 @@ app.get('/api/science/botanical', async (req, res) => {
   }
 });
 
-// Vite middleware in dev / static in prod
-const PORT = 3000;
+// Vite middleware in dev / static in prod (with resilient fallback if dist/ does not exist)
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
 async function startServer() {
-  if (process.env.NODE_ENV !== 'production') {
+  const distDir = path.resolve(__dirname, 'dist');
+  const distIndex = path.resolve(distDir, 'index.html');
+  const hasDist = fs.existsSync(distIndex);
+
+  if (process.env.NODE_ENV !== 'production' || !hasDist) {
+    if (!hasDist && process.env.NODE_ENV === 'production') {
+      console.warn('⚠️ Warning: dist/index.html not found. Falling back to dynamic Vite SPA middleware to prevent ENOENT crash.');
+    }
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -372,9 +393,9 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
+    app.use(express.static(distDir));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
+      res.sendFile(distIndex);
     });
   }
 

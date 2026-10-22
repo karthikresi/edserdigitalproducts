@@ -164,6 +164,51 @@
         }
       },
       "required": ["reviewId", "productId", "userId", "userName", "rating", "comment", "createdAt"]
+    },
+    "ClientErrorLog": {
+      "title": "ClientErrorLog",
+      "description": "Production client runtime error report captured by ErrorBoundary",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "maxLength": 128
+        },
+        "message": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "stack": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "componentStack": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "userAgent": {
+          "type": "string",
+          "maxLength": 512
+        },
+        "userId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "userEmail": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "timestamp": {
+          "type": "string",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "message", "timestamp"]
     }
   },
   "firestore": {
@@ -182,6 +227,10 @@
     "/products/{productId}/reviews/{reviewId}": {
       "schema": "ProductReview",
       "description": "Public customer feedback and star ratings on products"
+    },
+    "/error_logs/{logId}": {
+      "schema": "ClientErrorLog",
+      "description": "System and client runtime error logs captured by ErrorBoundary"
     }
   }
 }
