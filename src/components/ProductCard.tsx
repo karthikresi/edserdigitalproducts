@@ -2,6 +2,7 @@ import React from 'react';
 import { Product } from '../types';
 import { ShoppingBag, Eye, Download, Check, Heart } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { handleImageFallback } from '../utils/imageFallback';
 
 interface ProductCardProps {
   product: Product;
@@ -59,6 +60,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           referrerPolicy="no-referrer"
           className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
           loading="lazy"
+          onError={(e) => handleImageFallback(e, product.title, product.category)}
         />
 
         {/* Wishlist Button floating top-right */}

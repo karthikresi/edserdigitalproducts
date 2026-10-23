@@ -27,6 +27,10 @@ export const ShopView: React.FC<ShopViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [formatFilter, setFormatFilter] = useState<string>('all');
 
+  React.useEffect(() => {
+    setSelectedCategory(initialCategory);
+  }, [initialCategory]);
+
   const filteredProducts = products.filter((product) => {
     const matchesCategory =
       selectedCategory === 'all' || product.category === selectedCategory;

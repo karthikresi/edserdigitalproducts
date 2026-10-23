@@ -34,6 +34,22 @@ export const CreativeStudioModal: React.FC<CreativeStudioModalProps> = ({ isOpen
   const [scienceResults, setScienceResults] = useState<any[]>([]);
   const [isScienceLoading, setIsScienceLoading] = useState(false);
 
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   // Handle Video Generation (Veo)

@@ -25,6 +25,7 @@ import {
 import { triggerHaptic } from '../utils/haptics';
 import { downloadProductPackage } from '../utils/fileDownloader';
 import { PrintPreview } from './PrintPreview';
+import { handleImageFallback } from '../utils/imageFallback';
 import { db } from '../firebase';
 import { User } from 'firebase/auth';
 import {
@@ -340,6 +341,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     alt={product.title}
                     referrerPolicy="no-referrer"
                     className="w-full h-full object-cover"
+                    onError={(e) => handleImageFallback(e, product.title, product.category)}
                   />
                   <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button

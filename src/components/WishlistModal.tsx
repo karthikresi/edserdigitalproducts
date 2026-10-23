@@ -6,6 +6,7 @@ import { db } from '../firebase';
 import { handleFirestoreError, OperationType } from '../utils/firestoreError';
 import { X, Heart, ShoppingBag, Trash2, ShieldCheck, Sparkles, LogIn, ArrowRight } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { handleImageFallback } from '../utils/imageFallback';
 
 interface WishlistModalProps {
   isOpen: boolean;
@@ -57,6 +58,22 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({
       loadUserPrefs();
     }
   }, [user, isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -196,7 +213,9 @@ export const WishlistModal: React.FC<WishlistModalProps> = ({
                     <img
                       src={product.image}
                       alt={product.title}
+                      referrerPolicy="no-referrer"
                       className="w-16 h-16 object-cover rounded-lg bg-stone-100 shrink-0 cursor-pointer"
+                      onError={(e) => handleImageFallback(e, product.title, product.category)}
                       onClick={() => {
                         onSelectProduct(product);
                         onClose();

@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { CartItem } from '../types';
 import { X, Trash2, Plus, Minus, ArrowRight, ShieldCheck, Download } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { handleImageFallback } from '../utils/imageFallback';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -110,6 +111,7 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
                     alt={product.title}
                     referrerPolicy="no-referrer"
                     className="w-18 h-18 object-cover rounded-lg bg-stone-100 shrink-0 cursor-pointer"
+                    onError={(e) => handleImageFallback(e, product.title, product.category)}
                     onClick={() => {
                       onSelectProduct(product);
                       onClose();

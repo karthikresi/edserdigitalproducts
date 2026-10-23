@@ -1,6 +1,12 @@
 import { Product, CollectionNotification } from '../types';
 
-export const HERO_IMAGE = '/src/assets/images/hero_edser_lifestyle_1791993264904.jpg';
+// Bundled image assets for production reliability
+import heroImg from '../assets/images/hero_edser_lifestyle_1791993264904.jpg';
+import mealPlannerImg from '../assets/images/product_meal_planner_sheet_1791993267093.jpg';
+import roseDailyImg from '../assets/images/product_rose_daily_planner_1791993267128.jpg';
+import nationalParksImg from '../assets/images/product_national_parks_adventure_1791993267417.jpg';
+
+export const HERO_IMAGE = heroImg;
 
 export const PRODUCTS: Product[] = [
   {
@@ -11,7 +17,7 @@ export const PRODUCTS: Product[] = [
     price: 9.00,
     shortDescription: 'An editable four-week spreadsheet for meal planning and grocery organization.',
     fullDescription: 'Take the guesswork out of family dinners and pantry stocking. This editable four-week spreadsheet streamlines your weekly meal schedule, tracks ingredient inventories, and automatically compiles your categorized grocery shopping list as you plan.',
-    image: '/src/assets/images/product_meal_planner_sheet_1791993267093.jpg',
+    image: mealPlannerImg,
     formats: ['Excel Spreadsheet (.xlsx)', 'Google Sheets One-Click Copy Link', 'Printable PDF Template (US Letter & A4)'],
     sizes: ['US Letter (8.5 × 11 in)', 'A4 (210 × 297 mm)', 'Dynamic Screen Display'],
     includedContents: [
@@ -49,7 +55,7 @@ export const PRODUCTS: Product[] = [
     price: 14.00,
     shortDescription: 'Printable daily, weekly, and monthly planner PDFs in A4 and US Letter sizes.',
     fullDescription: 'A serene, undated planning system designed to reduce overwhelm and bring calm intentionality to each day. Featuring delicate soft rose tones and warm ivory accents, this printable suite includes comprehensive daily schedules, weekly overviews, and 12 flexible monthly spreads that you can start anytime.',
-    image: '/src/assets/images/product_rose_daily_planner_1791993267128.jpg',
+    image: roseDailyImg,
     formats: ['Print-Ready High-Res Vector PDF (300 DPI)', 'Interactive Hyperlinked PDF for Tablet Apps'],
     sizes: ['US Letter (8.5 × 11 in)', 'A4 (210 × 297 mm)'],
     includedContents: [
@@ -86,7 +92,7 @@ export const PRODUCTS: Product[] = [
     price: 8.50,
     shortDescription: 'A printable coloring and activity book for children ages 4–8.',
     fullDescription: 'Ignite curiosity about the great outdoors with screen-free, hands-on creative play. This printable 34-page adventure book guides young explorers through Yellowstone, Yosemite, the Grand Canyon, and more with delightful animal illustrations, simple wilderness mazes, word-tracing, and nature scavenger hunts.',
-    image: '/src/assets/images/product_national_parks_adventure_1791993267417.jpg',
+    image: nationalParksImg,
     formats: ['Printable High-Res PDF (300 DPI Black & White Artwork + Full-Color Cover)'],
     sizes: ['US Letter (8.5 × 11 in)', 'A4 (210 × 297 mm)'],
     includedContents: [

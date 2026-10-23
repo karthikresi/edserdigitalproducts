@@ -5,6 +5,7 @@ import { HowItWorks } from '../components/HowItWorks';
 import { HERO_IMAGE } from '../data/products';
 import { ArrowRight, Sparkles, Bell, Download, ShieldCheck, Heart } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
+import { handleImageFallback } from '../utils/imageFallback';
 
 interface HomeViewProps {
   products: Product[];
@@ -105,6 +106,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
                   alt="Aesthetic flatlay of printed undated daily planners, botanical sprigs, and creative stationery"
                   referrerPolicy="no-referrer"
                   className="w-full h-full object-cover"
+                  onError={(e) => handleImageFallback(e, 'EDSER Digital Stationery Collection', 'planners-organization')}
                 />
               </div>
             </div>

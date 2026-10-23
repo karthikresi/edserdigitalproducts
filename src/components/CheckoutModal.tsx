@@ -3,6 +3,7 @@ import { CartItem, Order } from '../types';
 import { X, CheckCircle2, Download, ShieldCheck, CreditCard, ArrowLeft, Mail, FileCheck } from 'lucide-react';
 import { triggerHaptic } from '../utils/haptics';
 import { downloadProductPackage } from '../utils/fileDownloader';
+import { handleImageFallback } from '../utils/imageFallback';
 import { auth, db } from '../firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { handleFirestoreError, OperationType } from '../utils/firestoreError';
@@ -34,6 +35,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setName(auth.currentUser.displayName || '');
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen && !isProcessing) {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'auto';
+    };
+  }, [isOpen, isProcessing, onClose]);
 
   if (!isOpen) return null;
 
@@ -183,7 +200,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                       <img
                         src={product.image}
                         alt=""
+                        referrerPolicy="no-referrer"
                         className="w-12 h-12 object-cover rounded-md bg-stone-100 shrink-0"
+                        onError={(e) => handleImageFallback(e, product.title, product.category)}
                       />
                       <div>
                         <h5 className="font-serif font-bold text-sm text-[#2D2A26]">{product.title}</h5>
